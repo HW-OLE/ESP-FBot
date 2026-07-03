@@ -34,7 +34,7 @@ CONFIG_SCHEMA = cv.All(
             cv.Optional(CONF_DEVICE_MODEL, default=DEVICE_MODEL_P210_P310): cv.enum({
                 DEVICE_MODEL_P210_P310: 0,
                 DEVICE_MODEL_P180: 1,
-            }, upper=True),
+            }),
         }
     )
     .extend(cv.COMPONENT_SCHEMA)
