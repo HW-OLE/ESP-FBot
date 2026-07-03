@@ -38,6 +38,8 @@ struct RegisterMap {
   // Protocol parameters
   uint16_t register_count;           // Number of registers to read (80 for P210/P310, 100 for P180)
   uint8_t soc_register;              // State of charge register index
+  uint8_t battery_s1_register;       // Extra battery 1 register index
+  uint8_t battery_s2_register;       // Extra battery 2 register index
   uint8_t state_flags_register;      // Output state flags register
   
   // Control registers
@@ -66,6 +68,8 @@ struct RegisterMap {
 static const RegisterMap REGISTER_MAP_P210_P310 = {
   .register_count = 80,
   .soc_register = 56,
+  .battery_s1_register = 53,
+  .battery_s2_register = 55,
   .state_flags_register = 41,
   .usb_control_register = 24,
   .dc_control_register = 25,
@@ -90,8 +94,10 @@ static const RegisterMap REGISTER_MAP_P210_P310 = {
 // See: https://github.com/iamslan/ha-fossibot/issues/31 and https://github.com/schauveau/lesyd/issues/6
 static const RegisterMap REGISTER_MAP_P180 = {
   .register_count = 100,           // 0x64 - P180 uses 100 registers vs 80 for P210/P310
-  .soc_register = 56,              // TODO: Verify if this is 53 or 56 - community sources differ
-  .state_flags_register = 41,      // TODO: Verify - may be different offset in P180
+  .soc_register = 53,              // P180 primary SOC register based on current behavior
+  .battery_s1_register = 56,
+  .battery_s2_register = 55,
+  .state_flags_register = 41,      // P180 state flags still assumed to match P210/P310
   .usb_control_register = 24,      // TODO: Verify control register addresses
   .dc_control_register = 25,       // Confirmed AC (26) works. DC/USB/Light need verification.
   .ac_control_register = 26,       // CONFIRMED via local MQTT: register 26 (0x1A) = AC control

@@ -374,8 +374,8 @@ void Fbot::parse_notification(const uint8_t *data, uint16_t length) {
   // Parse key registers
   float battery_percent = this->get_register(data, length, this->register_map_.soc_register) / 10.0f;
   // Extra batteries (S1 / S2) ranges are 1 to 101, 0 means disconnected. Adding -1 to get proper range.
-  float battery_percent_s1 = this->get_register(data, length, 53) / 10.0f - 1.0f;
-  float battery_percent_s2 = this->get_register(data, length, 55) / 10.0f - 1.0f;
+  float battery_percent_s1 = this->get_register(data, length, this->register_map_.battery_s1_register) / 10.0f - 1.0f;
+  float battery_percent_s2 = this->get_register(data, length, this->register_map_.battery_s2_register) / 10.0f - 1.0f;
   
   // Charge level: register 2, values 1-5 map to 300W-1100W (increment by 200W)
   // 1 = 300, 2 = 500, 3 = 700, 4 = 900, 5 = 1100W
@@ -386,8 +386,8 @@ void Fbot::parse_notification(const uint8_t *data, uint16_t length) {
   }
   
   // Determine if extra batteries are connected (raw value of 0 means disconnected)
-  bool battery_s1_connected = this->get_register(data, length, 53) > 0;
-  bool battery_s2_connected = this->get_register(data, length, 55) > 0;
+  bool battery_s1_connected = this->get_register(data, length, this->register_map_.battery_s1_register) > 0;
+  bool battery_s2_connected = this->get_register(data, length, this->register_map_.battery_s2_register) > 0;
   
   // Set to NAN if battery percentages are outside valid range (0-100)
   if (battery_percent_s1 < 0.0f || battery_percent_s1 > 100.0f) {
