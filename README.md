@@ -7,6 +7,7 @@ This is a HomeAssistant, ESP-Home custom component for locally monitoring and co
  - [FOSSiBOT F3600 Pro](https://www.fossibot.com/products/fossibot-f3600-pro), [FOSSiBOT F2400](https://www.fossibot.com/products/fossibot-f2400)
  - [SYDPOWER N052](https://www.sydpower.com/product/n052?id=665461cb8b0da4a4e43e4609), [SYDPOWER N066](https://www.sydpower.com/product/detail?id=665462e4a7c432936b1b583d)
  - [AFERIY P210](https://www.aferiy.com/products/aferiy-p210-portable-power-station-2400w-2048wh), [AFERIY P310](https://www.aferiy.com/products/aferiy-p310-portable-power-station-3300w-3840wh)
+ - [AFERIY P180 / Nomad 1800](https://www.aferiy.com/products/nomad-1800) (requires `device_model: p180` config)
  - [ABOK Power Ark3600](https://abokpower.com/all-products/portable-power-station-3600/) (Probalby works, but not tested)
  
 Basically, any power station that works with the "BrightEMS" application. You normally manage these batteries thru a cloud service, which is not ideal in outage situations. Instead, you can get fast local management by loading this ESP-Home component on a small device near the battery. The device will communicate to the battery using Bluetooth and relay the data locally using WIFI to Home Assistant.
@@ -94,6 +95,7 @@ fbot:
   settings_polling_interval: 30s    # Holding registers (default: 60s)
   poll_timeout: 15s                 # Time to wait for response (default 15s)
   max_poll_failures: 5              # Failures before disconnect (default 3)
+  # device_model: p210_p310         # Device model: p210_p310 (default) or p180
 
 # Binary sensors for connection and output states
 binary_sensor:
@@ -264,6 +266,43 @@ select:
 ```
 
 </details>
+
+## Device Models
+
+### P210/P310 (Default)
+The default configuration supports AFERIY P210/P310 and most other BrightEMS-compatible devices. These use 80 Modbus registers for communication.
+
+### P180 / Nomad 1800
+If you have an AFERIY P180 (Nomad 1800), add the `device_model: p180` option to your fbot configuration:
+
+```yaml
+fbot:
+  id: my_fbot
+  device_model: p180
+  polling_interval: 5s
+  # ... rest of configuration
+```
+
+**Important Notes for P180:**
+- The P180 uses 100 Modbus registers instead of 80, which this component now handles automatically
+- Output control writes (AC/DC/USB/Light switching) are confirmed working for AC output
+- DC/USB/Light control registers are marked with TODO comments pending empirical verification on real hardware
+- Register offsets for sensor readings may vary; enable `VERY_VERBOSE` logging to dump raw frame bytes for verification
+- See [community reverse-engineering](https://github.com/iamslan/ha-fossibot/issues/31) for technical details
+
+**Debugging P180 Register Offsets:**
+If you experience incorrect sensor readings on P180, enable verbose logging in ESPHome and check the `RX Frame` dumps:
+
+```yaml
+logger:
+  level: VERY_VERBOSE
+```
+
+The frame dump shows raw bytes in 16-byte blocks. Each sensor is 2 bytes (big-endian 16-bit register):
+- Byte offset = 6 + (register_index × 2)
+- Example: register 56 (SOC) starts at byte offset 6 + (56 × 2) = 118
+
+Report any offset corrections to help improve P180 support!
 
 ## Battery Factory Reset
 

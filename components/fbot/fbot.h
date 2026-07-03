@@ -27,24 +27,90 @@ static const char *const SERVICE_UUID = "0000a002-0000-1000-8000-00805f9b34fb";
 static const char *const WRITE_CHAR_UUID = "0000c304-0000-1000-8000-00805f9b34fb";
 static const char *const NOTIFY_CHAR_UUID = "0000c305-0000-1000-8000-00805f9b34fb";
 
-// Register definitions
-static const uint8_t REG_USB_CONTROL = 24;
-static const uint8_t REG_DC_CONTROL = 25;
-static const uint8_t REG_AC_CONTROL = 26;
-static const uint8_t REG_LIGHT_CONTROL = 27;
-static const uint8_t REG_USB_A1_OUT = 30;
-static const uint8_t REG_USB_A2_OUT = 31;
-static const uint8_t REG_USB_C1_OUT = 34;
-static const uint8_t REG_USB_C2_OUT = 35;
-static const uint8_t REG_USB_C3_OUT = 36;
-static const uint8_t REG_USB_C4_OUT = 37;
-static const uint8_t REG_KEY_SOUND = 56;
-static const uint8_t REG_AC_SILENT_CONTROL = 57;
-static const uint8_t REG_THRESHOLD_DISCHARGE = 66;
-static const uint8_t REG_THRESHOLD_CHARGE = 67;
-static const uint8_t REG_AC_CHARGE_LIMIT = 13;
+// Device types
+enum class DeviceType {
+  P210_P310,    // AFERIY P210/P310 and compatible models (80 registers)
+  P180,         // AFERIY P180 / Nomad 1800 (100 registers)
+};
 
-// State flag bit masks for register 41
+// Register map configuration for different device models
+struct RegisterMap {
+  // Protocol parameters
+  uint16_t register_count;           // Number of registers to read (80 for P210/P310, 100 for P180)
+  uint8_t soc_register;              // State of charge register index
+  uint8_t state_flags_register;      // Output state flags register
+  
+  // Control registers
+  uint8_t usb_control_register;
+  uint8_t dc_control_register;
+  uint8_t ac_control_register;
+  uint8_t light_control_register;
+  
+  // Output power registers
+  uint8_t usb_a1_out_register;
+  uint8_t usb_a2_out_register;
+  uint8_t usb_c1_out_register;
+  uint8_t usb_c2_out_register;
+  uint8_t usb_c3_out_register;
+  uint8_t usb_c4_out_register;
+  
+  // Setting registers
+  uint8_t key_sound_register;
+  uint8_t ac_silent_register;
+  uint8_t threshold_discharge_register;
+  uint8_t threshold_charge_register;
+  uint8_t ac_charge_limit_register;
+};
+
+// P210/P310 register map (80 registers, standard BrightEMS format)
+static const RegisterMap REGISTER_MAP_P210_P310 = {
+  .register_count = 80,
+  .soc_register = 56,
+  .state_flags_register = 41,
+  .usb_control_register = 24,
+  .dc_control_register = 25,
+  .ac_control_register = 26,
+  .light_control_register = 27,
+  .usb_a1_out_register = 30,
+  .usb_a2_out_register = 31,
+  .usb_c1_out_register = 34,
+  .usb_c2_out_register = 35,
+  .usb_c3_out_register = 36,
+  .usb_c4_out_register = 37,
+  .key_sound_register = 56,
+  .ac_silent_register = 57,
+  .threshold_discharge_register = 66,
+  .threshold_charge_register = 67,
+  .ac_charge_limit_register = 13,
+};
+
+// P180 register map (100 registers, extended format for AFERIY P180 / Nomad 1800)
+// IMPORTANT: Register offsets for P180 are experimental and based on community reverse-engineering.
+// These may need adjustment based on empirical testing with real hardware.
+// See: https://github.com/iamslan/ha-fossibot/issues/31 and https://github.com/schauveau/lesyd/issues/6
+static const RegisterMap REGISTER_MAP_P180 = {
+  .register_count = 100,           // 0x64 - P180 uses 100 registers vs 80 for P210/P310
+  .soc_register = 56,              // TODO: Verify if this is 53 or 56 - community sources differ
+  .state_flags_register = 41,      // TODO: Verify - may be different offset in P180
+  .usb_control_register = 24,      // TODO: Verify control register addresses
+  .dc_control_register = 25,       // Confirmed AC (26) works. DC/USB/Light need verification.
+  .ac_control_register = 26,       // CONFIRMED via local MQTT: register 26 (0x1A) = AC control
+  .light_control_register = 27,    // TODO: Needs verification
+  .usb_a1_out_register = 30,       // TODO: Verify USB port power registers
+  .usb_a2_out_register = 31,       // TODO: Verify USB port power registers
+  .usb_c1_out_register = 34,       // TODO: Verify USB port power registers
+  .usb_c2_out_register = 35,       // TODO: Verify USB port power registers
+  .usb_c3_out_register = 36,       // TODO: Verify USB port power registers
+  .usb_c4_out_register = 37,       // TODO: Verify USB port power registers
+  .key_sound_register = 56,        // TODO: Verify settings registers
+  .ac_silent_register = 57,        // TODO: Verify settings registers
+  .threshold_discharge_register = 66,  // TODO: Verify settings registers
+  .threshold_charge_register = 67,     // TODO: Verify settings registers
+  .ac_charge_limit_register = 13,      // TODO: Verify settings registers
+};
+
+// State flag bit masks for register 41 (P210/P310)
+// TODO: Verify these apply to P180 as well, or if P180 uses different bit positions
 static const uint16_t STATE_USB_BIT = 512;   // bit 9
 static const uint16_t STATE_DC_BIT = 1024;   // bit 10
 static const uint16_t STATE_AC_BIT = 2048;   // bit 11
@@ -65,6 +131,20 @@ class Fbot : public esphome::ble_client::BLEClientNode, public Component {
   void set_settings_polling_interval(uint32_t interval) { this->settings_polling_interval_ = interval; }
   void set_poll_timeout(uint32_t timeout) { this->poll_timeout_ms_ = timeout; }
   void set_max_poll_failures(uint8_t max_failures) { this->max_poll_failures_ = max_failures; }
+  void set_device_type(DeviceType device_type) { this->device_type_ = device_type; this->update_register_map(); }
+  // Overload for integer device_type from Python config
+  void set_device_type(uint32_t device_type) { 
+    this->device_type_ = static_cast<DeviceType>(device_type); 
+    this->update_register_map(); 
+  }
+  void set_device_type_by_name(const std::string &name) {
+    // Auto-detect device type based on BLE device name
+    if (name.find("POWER-V1-1C83") != std::string::npos || name.find("Nomad 1800") != std::string::npos) {
+      this->set_device_type(DeviceType::P180);
+    } else {
+      this->set_device_type(DeviceType::P210_P310);  // Default to P210/P310
+    }
+  }
   
   // Sensor setters
   void set_battery_percent_sensor(sensor::Sensor *sensor) { this->battery_percent_sensor_ = sensor; }
@@ -241,11 +321,17 @@ class Fbot : public esphome::ble_client::BLEClientNode, public Component {
   void parse_notification(const uint8_t *data, uint16_t length);
   void parse_settings_notification(const uint8_t *data, uint16_t length);
   uint16_t get_register(const uint8_t *data, uint16_t length, uint16_t reg_index);
+  void dump_frame_bytes(const uint8_t *data, uint16_t length, const char *label);
+  void update_register_map();
   
   // State management
   void update_connected_state(bool state);
   void reset_sensors_to_unknown();
   void check_poll_timeout();
+  
+  // Device configuration
+  DeviceType device_type_{DeviceType::P210_P310};
+  RegisterMap register_map_{REGISTER_MAP_P210_P310};
 };
 
 }  // namespace fbot

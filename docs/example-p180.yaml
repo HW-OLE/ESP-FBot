@@ -1,0 +1,250 @@
+# ESPHome configuration example for AFERIY P180 / Nomad 1800
+# This configuration demonstrates P180-specific settings for the esp-fbot component
+# 
+# Key differences from P210/P310:
+# - Uses 100 Modbus registers (vs 80 for P210/P310)
+# - Requires device_model: p180 configuration
+# - Power readings may differ in range and accuracy vs P210/P310
+#
+# To get the MAC address:
+# - On Windows, use BluetoothLEView: https://www.nirsoft.net/utils/bluetooth_low_energy_scanner.html
+# - Look for device starting with "POWER-V1" (e.g., POWER-V1-1C83)
+# - MAC address format: "AA:BB:CC:DD:EE:FF"
+
+esphome:
+  name: p180-battery
+  friendly_name: P180 Portable Power
+  comment: "AFERIY P180 / Nomad 1800 (1800Wh) Power Station"
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "PUT_YOUR_GENERATED_KEY_HERE"
+
+ota:
+  - platform: esphome
+    password: "PUT_YOUR_OTA_PASSWORD_HERE"
+
+# WiFi configuration
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  # Optional: Enable WiFi AP for recovery
+  ap:
+    ssid: "P180-Battery"
+    password: "P180battery"
+
+# Enable logging - use VERY_VERBOSE to debug register offsets
+logger:
+  level: DEBUG  # Use VERY_VERBOSE for detailed frame dumps (takes more memory)
+  # Uncomment below for very verbose output (for debugging):
+  # level: VERY_VERBOSE
+
+# Load external component
+external_components:
+  - source: github://ylianst/esp-fbot
+    refresh: 10s
+
+# BLE Client configuration - uses the P180's Bluetooth MAC address
+ble_client:
+  - mac_address: "AA:BB:CC:DD:EE:FF"  # REPLACE with your P180 MAC address
+
+# Configure the Fbot component for P180
+# Key setting: device_model: p180 (use p210_p310 for other devices)
+fbot:
+  id: p180_fbot
+  device_model: p180                # IMPORTANT: Set to p180 for Nomad 1800
+  polling_interval: 2s              # Request status every 2 seconds
+  settings_polling_interval: 30s    # Request settings every 30 seconds
+  poll_timeout: 15s                 # Wait up to 15s for response
+  max_poll_failures: 5              # Disconnect after 5 consecutive failures
+
+# Binary sensors for connection status and output states
+binary_sensor:
+  - platform: fbot
+    fbot_id: p180_fbot
+    connected:
+      name: "Connected"
+      icon: mdi:bluetooth
+    usb_active:
+      name: "USB Output Active"
+      icon: mdi:usb
+    dc_active:
+      name: "DC Output Active"
+      icon: mdi:lightning-bolt
+    ac_active:
+      name: "AC Inverter Active"
+      icon: mdi:power-plug
+    light_active:
+      name: "Light Active"
+      icon: mdi:lightbulb
+
+# Sensors for battery and power monitoring
+sensor:
+  - platform: fbot
+    fbot_id: p180_fbot
+    battery_level:
+      name: "Battery State of Charge"
+      unit_of_measurement: "%"
+      icon: mdi:battery
+      # Note: P180 SOC register may differ from P210/P310
+      # If readings are incorrect, enable VERY_VERBOSE logging to debug
+    ac_input_power:
+      name: "AC Input Power"
+      unit_of_measurement: "W"
+      icon: mdi:power-plug-in
+    dc_input_power:
+      name: "DC Input Power"
+      unit_of_measurement: "W"
+    input_power:
+      name: "Total Input Power"
+      unit_of_measurement: "W"
+    output_power:
+      name: "Output Power"
+      unit_of_measurement: "W"
+      icon: mdi:power-plug-outline
+    system_power:
+      name: "System Power"
+      unit_of_measurement: "W"
+    total_power:
+      name: "Total Output Power"
+      unit_of_measurement: "W"
+    remaining_time:
+      name: "Remaining Time"
+      unit_of_measurement: "min"
+      icon: mdi:timer
+    ac_out_voltage:
+      name: "AC Output Voltage"
+      unit_of_measurement: "V"
+    ac_out_frequency:
+      name: "AC Output Frequency"
+      unit_of_measurement: "Hz"
+    ac_in_frequency:
+      name: "AC Input Frequency"
+      unit_of_measurement: "Hz"
+    threshold_charge:
+      name: "Charge Threshold"
+      unit_of_measurement: "%"
+      icon: mdi:battery-charging
+    threshold_discharge:
+      name: "Discharge Threshold"
+      unit_of_measurement: "%"
+      icon: mdi:battery-low
+    charge_level:
+      name: "Charge Level"
+      unit_of_measurement: "W"
+    time_to_full:
+      name: "Time to Full Charge"
+      unit_of_measurement: "min"
+    # USB power outputs (useful for monitoring per-port power draw)
+    usb_c1_power:
+      name: "USB-C1 Power"
+      unit_of_measurement: "W"
+      icon: mdi:usb
+      # Note: P180 may have different max power ratings than P210/P310
+      # Monitor these values to verify they match your device specs
+    usb_c2_power:
+      name: "USB-C2 Power"
+      unit_of_measurement: "W"
+      icon: mdi:usb
+    usb_a1_power:
+      name: "USB-A1 Power"
+      unit_of_measurement: "W"
+      icon: mdi:usb
+
+# Template sensors for derived values
+template:
+  sensor:
+    - name: "Battery Remaining Hours"
+      unit_of_measurement: "h"
+      icon: mdi:timer-sand
+      accuracy_decimals: 1
+      lambda: |-
+        if (id(p180_remaining_time).has_state()) {
+          return id(p180_remaining_time).state / 60.0;
+        }
+        return 0.0;
+      update_interval: 5s
+    - name: "Net Charging Power"
+      unit_of_measurement: "W"
+      icon: mdi:power-meter
+      accuracy_decimals: 0
+      device_class: power
+      lambda: |-
+        if (id(p180_input_power).has_state() && id(p180_output_power).has_state()) {
+          return id(p180_input_power).state - id(p180_output_power).state;
+        }
+        return 0.0;
+      update_interval: 5s
+
+# Switches to control power outputs
+# WARNING: AC control is confirmed working. DC/USB/Light may need empirical verification on P180.
+switch:
+  - platform: fbot
+    fbot_id: p180_fbot
+    usb:
+      name: "USB Outputs"
+      icon: mdi:usb
+    dc:
+      name: "DC Output"
+      icon: mdi:lightning-bolt
+    ac:
+      name: "AC Inverter"
+      icon: mdi:power-plug
+      # Note: AC control (register 26) is confirmed working for P180
+      # via community testing. DC/USB/Light registers need verification.
+    light:
+      name: "Light"
+      icon: mdi:lightbulb
+    key_sound:
+      name: "Key Sound"
+      icon: mdi:volume-high
+    ac_silent:
+      name: "AC Silent Mode"
+      icon: mdi:volume-mute
+
+# Number controls for configurable thresholds
+number:
+  - platform: fbot
+    fbot_id: p180_fbot
+    threshold_charge:
+      name: "Charge Threshold"
+      min_value: 10
+      max_value: 100
+      step: 1
+      icon: mdi:battery-charging-high
+      unit_of_measurement: "%"
+    threshold_discharge:
+      name: "Discharge Threshold"
+      min_value: 0
+      max_value: 50
+      step: 1
+      icon: mdi:battery-low
+      unit_of_measurement: "%"
+
+# Select controls for modes
+select:
+  - platform: fbot
+    fbot_id: p180_fbot
+    light_mode:
+      name: "Light Mode"
+      icon: mdi:lightbulb-auto
+      options:
+        - "Off"
+        - "On"
+        - "SOS"
+        - "Flashing"
+    ac_charge_limit:
+      name: "AC Charge Limit"
+      icon: mdi:charging-20
+      options:
+        - "300W"
+        - "500W"
+        - "700W"
+        - "900W"
+        - "1100W"

@@ -50,6 +50,17 @@ void Fbot::loop() {
 
 void Fbot::dump_config() {
   ESP_LOGCONFIG(TAG, "Fbot Battery:");
+  const char *device_model_name = "Unknown";
+  switch (this->device_type_) {
+    case DeviceType::P180:
+      device_model_name = "AFERIY P180 (Nomad 1800) - 100 registers";
+      break;
+    case DeviceType::P210_P310:
+    default:
+      device_model_name = "P210/P310 - 80 registers";
+      break;
+  }
+  ESP_LOGCONFIG(TAG, "  Device model: %s", device_model_name);
   ESP_LOGCONFIG(TAG, "  Polling interval: %ums", this->polling_interval_);
   ESP_LOGCONFIG(TAG, "  Settings polling interval: %ums", this->settings_polling_interval_);
   ESP_LOGCONFIG(TAG, "  Poll timeout: %ums", this->poll_timeout_ms_);
@@ -208,18 +219,59 @@ void Fbot::generate_command_bytes(uint8_t address, uint16_t reg, uint16_t value,
   output[7] = crc & 0xFF;
 }
 
+void Fbot::update_register_map() {
+  // Select register map based on device type
+  switch (this->device_type_) {
+    case DeviceType::P180:
+      this->register_map_ = REGISTER_MAP_P180;
+      ESP_LOGI(TAG, "Device type: AFERIY P180 (100 registers)");
+      break;
+    case DeviceType::P210_P310:
+    default:
+      this->register_map_ = REGISTER_MAP_P210_P310;
+      ESP_LOGI(TAG, "Device type: P210/P310 (80 registers)");
+      break;
+  }
+}
+
+void Fbot::dump_frame_bytes(const uint8_t *data, uint16_t length, const char *label) {
+  // Dump raw frame bytes for debugging register offsets
+  if (length == 0 || length > 256) {
+    ESP_LOGVV(TAG, "%s: Invalid length %d", label, length);
+    return;
+  }
+  
+  // Split into multiple log lines to avoid excessive line length
+  char hex_buffer[128];
+  int offset = 0;
+  
+  for (uint16_t i = 0; i < length; i += 16) {
+    hex_buffer[0] = '\0';
+    for (uint16_t j = i; j < i + 16 && j < length; j++) {
+      snprintf(hex_buffer + strlen(hex_buffer), sizeof(hex_buffer) - strlen(hex_buffer), 
+               "%02x ", data[j]);
+    }
+    ESP_LOGVV(TAG, "%s [%3d-%3d]: %s", label, i, i + 15, hex_buffer);
+  }
+}
+
 void Fbot::send_read_request() {
   if (!this->connected_ || !this->characteristics_discovered_) {
     return;
   }
   
-  // Read 80 registers starting from 0: [0x11, 0x04, 0x00, 0x00, 0x00, 0x50]
-  uint8_t payload[6] = {0x11, 0x04, 0x00, 0x00, 0x00, 0x50};
+  // Read registers starting from 0 (count depends on device type)
+  // Function code 0x04 = Read Input Registers
+  uint16_t reg_count = this->register_map_.register_count;
+  uint8_t payload[6] = {0x11, 0x04, 0x00, 0x00, (uint8_t)(reg_count >> 8), (uint8_t)(reg_count & 0xFF)};
   uint16_t crc = this->calculate_checksum(payload, 6);
   uint8_t command[8];
   memcpy(command, payload, 6);
   command[6] = (crc >> 8) & 0xFF;
   command[7] = crc & 0xFF;
+  
+  ESP_LOGVV(TAG, "Sending read request for %d registers (frame: 11 04 00 00 %02x %02x)", 
+            reg_count, command[4], command[5]);
   
   auto status = esp_ble_gattc_write_char(this->parent()->get_gattc_if(), this->parent()->get_conn_id(),
                                          this->write_handle_, sizeof(command), command,
@@ -236,9 +288,10 @@ void Fbot::send_settings_request() {
     return;
   }
   
-  // Read 80 holding registers starting from 0: [0x11, 0x03, 0x00, 0x00, 0x00, 0x50]
+  // Read holding registers starting from 0 (count depends on device type)
   // Function code 0x03 = Read Holding Registers (settings)
-  uint8_t payload[6] = {0x11, 0x03, 0x00, 0x00, 0x00, 0x50};
+  uint16_t reg_count = this->register_map_.register_count;
+  uint8_t payload[6] = {0x11, 0x03, 0x00, 0x00, (uint8_t)(reg_count >> 8), (uint8_t)(reg_count & 0xFF)};
   uint16_t crc = this->calculate_checksum(payload, 6);
   uint8_t command[8];
   memcpy(command, payload, 6);
@@ -292,6 +345,9 @@ void Fbot::parse_notification(const uint8_t *data, uint16_t length) {
     return;
   }
   
+  // Dump raw frame bytes for debugging (very verbose level)
+  this->dump_frame_bytes(data, length, "RX Frame");
+  
   // ANY valid notification means device is responding - reset failure counter
   this->consecutive_poll_failures_ = 0;
   this->last_successful_poll_ = millis();
@@ -316,7 +372,7 @@ void Fbot::parse_notification(const uint8_t *data, uint16_t length) {
   }
   
   // Parse key registers
-  float battery_percent = this->get_register(data, length, 56) / 10.0f;
+  float battery_percent = this->get_register(data, length, this->register_map_.soc_register) / 10.0f;
   // Extra batteries (S1 / S2) ranges are 1 to 101, 0 means disconnected. Adding -1 to get proper range.
   float battery_percent_s1 = this->get_register(data, length, 53) / 10.0f - 1.0f;
   float battery_percent_s2 = this->get_register(data, length, 55) / 10.0f - 1.0f;
@@ -346,7 +402,7 @@ void Fbot::parse_notification(const uint8_t *data, uint16_t length) {
   uint16_t total_watts = this->get_register(data, length, 20);
   uint16_t system_watts = this->get_register(data, length, 21);
   uint16_t output_watts = this->get_register(data, length, 39);
-  uint16_t state_flags = this->get_register(data, length, 41);
+  uint16_t state_flags = this->get_register(data, length, this->register_map_.state_flags_register);
   float ac_out_voltage = this->get_register(data, length, 18) * 0.1f;
   float ac_out_frequency = this->get_register(data, length, 19) * 0.1f;
   float ac_in_frequency = this->get_register(data, length, 22) * 0.01f;
@@ -354,12 +410,12 @@ void Fbot::parse_notification(const uint8_t *data, uint16_t length) {
   uint16_t remaining_minutes = this->get_register(data, length, 59);
   
   // USB port power outputs (multiply by 0.1 to convert to watts)
-  float usb_a1_power = this->get_register(data, length, REG_USB_A1_OUT) * 0.1f;
-  float usb_a2_power = this->get_register(data, length, REG_USB_A2_OUT) * 0.1f;
-  float usb_c1_power = this->get_register(data, length, REG_USB_C1_OUT) * 0.1f;
-  float usb_c2_power = this->get_register(data, length, REG_USB_C2_OUT) * 0.1f;
-  float usb_c3_power = this->get_register(data, length, REG_USB_C3_OUT) * 0.1f;
-  float usb_c4_power = this->get_register(data, length, REG_USB_C4_OUT) * 0.1f;
+  float usb_a1_power = this->get_register(data, length, this->register_map_.usb_a1_out_register) * 0.1f;
+  float usb_a2_power = this->get_register(data, length, this->register_map_.usb_a2_out_register) * 0.1f;
+  float usb_c1_power = this->get_register(data, length, this->register_map_.usb_c1_out_register) * 0.1f;
+  float usb_c2_power = this->get_register(data, length, this->register_map_.usb_c2_out_register) * 0.1f;
+  float usb_c3_power = this->get_register(data, length, this->register_map_.usb_c3_out_register) * 0.1f;
+  float usb_c4_power = this->get_register(data, length, this->register_map_.usb_c4_out_register) * 0.1f;
   
   // Publish sensor values
   if (this->battery_percent_sensor_ != nullptr) {
@@ -476,30 +532,33 @@ void Fbot::parse_settings_notification(const uint8_t *data, uint16_t length) {
   // Parse holding registers (settings) from 0x1103 response
   ESP_LOGD(TAG, "Received settings notification");
   
+  // Dump raw frame bytes for debugging (very verbose level)
+  this->dump_frame_bytes(data, length, "RX Settings Frame");
+  
   // Mark that we've received settings at least once
   if (!this->settings_received_) {
     this->settings_received_ = true;
     ESP_LOGI(TAG, "First settings response received");
   }
   
-  // Parse AC Silent state (register 57: 0=off, 1=on)
-  bool ac_silent_state = this->get_register(data, length, REG_AC_SILENT_CONTROL) == 1;
+  // Parse AC Silent state (register: 0=off, 1=on)
+  bool ac_silent_state = this->get_register(data, length, this->register_map_.ac_silent_register) == 1;
   
   // Sync AC Silent switch state with device
   if (this->ac_silent_switch_ != nullptr) {
     this->ac_silent_switch_->publish_state(ac_silent_state);
   }
   
-  // Parse Key Sound state (register 56: 0=off, 1=on)
-  bool key_sound_state = this->get_register(data, length, REG_KEY_SOUND) == 1;
+  // Parse Key Sound state (register: 0=off, 1=on)
+  bool key_sound_state = this->get_register(data, length, this->register_map_.key_sound_register) == 1;
   
   // Sync Key Sound switch state with device
   if (this->key_sound_switch_ != nullptr) {
     this->key_sound_switch_->publish_state(key_sound_state);
   }
   
-  // Parse Light Mode state (register 27: 0=Off, 1=On, 2=SOS, 3=Flashing)
-  uint16_t light_mode_value = this->get_register(data, length, REG_LIGHT_CONTROL);
+  // Parse Light Mode state (register: 0=Off, 1=On, 2=SOS, 3=Flashing)
+  uint16_t light_mode_value = this->get_register(data, length, this->register_map_.light_control_register);
   
 #ifdef USE_SELECT
   // Sync Light Mode select state with device
@@ -515,8 +574,8 @@ void Fbot::parse_settings_notification(const uint8_t *data, uint16_t length) {
     this->light_mode_select_->publish_state(light_mode);
   }
   
-  // Parse AC Charge Limit state (register 13: values 1-5)
-  uint16_t ac_charge_limit_value = this->get_register(data, length, REG_AC_CHARGE_LIMIT);
+  // Parse AC Charge Limit state (register: values 1-5)
+  uint16_t ac_charge_limit_value = this->get_register(data, length, this->register_map_.ac_charge_limit_register);
   
   // Sync AC Charge Limit select state with device
   if (this->ac_charge_limit_select_ != nullptr && ac_charge_limit_value >= 1 && ac_charge_limit_value <= 5) {
@@ -528,10 +587,10 @@ void Fbot::parse_settings_notification(const uint8_t *data, uint16_t length) {
   }
 #endif
   
-  // Parse threshold registers (66 and 67 from holding registers)
+  // Parse threshold registers (from holding registers)
   // Values are in permille (divide by 10 for percentage)
-  float threshold_discharge = this->get_register(data, length, REG_THRESHOLD_DISCHARGE) / 10.0f;
-  float threshold_charge = this->get_register(data, length, REG_THRESHOLD_CHARGE) / 10.0f;
+  float threshold_discharge = this->get_register(data, length, this->register_map_.threshold_discharge_register) / 10.0f;
+  float threshold_charge = this->get_register(data, length, this->register_map_.threshold_charge_register) / 10.0f;
   
   // Publish threshold sensor values (read-only display)
   if (this->threshold_discharge_sensor_ != nullptr) {
@@ -564,20 +623,20 @@ void Fbot::update_connected_state(bool state) {
 
 // Control methods
 void Fbot::control_usb(bool state) {
-  this->send_control_command(REG_USB_CONTROL, state ? 1 : 0);
+  this->send_control_command(this->register_map_.usb_control_register, state ? 1 : 0);
 }
 
 void Fbot::control_dc(bool state) {
-  this->send_control_command(REG_DC_CONTROL, state ? 1 : 0);
+  this->send_control_command(this->register_map_.dc_control_register, state ? 1 : 0);
 }
 
 void Fbot::control_ac(bool state) {
-  this->send_control_command(REG_AC_CONTROL, state ? 1 : 0);
+  this->send_control_command(this->register_map_.ac_control_register, state ? 1 : 0);
 }
 
 void Fbot::control_light(bool state) {
   // Simple on/off control - uses value 1 for on, 0 for off
-  this->send_control_command(REG_LIGHT_CONTROL, state ? 1 : 0);
+  this->send_control_command(this->register_map_.light_control_register, state ? 1 : 0);
 }
 
 void Fbot::control_light_mode(const std::string &value) {
@@ -597,7 +656,7 @@ void Fbot::control_light_mode(const std::string &value) {
   }
   
   ESP_LOGI(TAG, "Setting light mode to: %s (value: %d)", value.c_str(), mode_value);
-  this->send_control_command(REG_LIGHT_CONTROL, mode_value);
+  this->send_control_command(this->register_map_.light_control_register, mode_value);
   
   // Update the light switch state based on the mode (off=false, any other mode=true)
   if (this->light_switch_ != nullptr) {
@@ -625,7 +684,7 @@ void Fbot::control_ac_charge_limit(const std::string &value) {
       }
       
       ESP_LOGI(TAG, "Setting AC Charge Limit to: %s (value: %d)", value.c_str(), reg_value);
-      this->send_control_command(REG_AC_CHARGE_LIMIT, reg_value);
+      this->send_control_command(this->register_map_.ac_charge_limit_register, reg_value);
       
       // Request settings update to confirm the change
       this->set_timeout(500, [this]() { 
@@ -642,9 +701,9 @@ void Fbot::control_ac_charge_limit(const std::string &value) {
 }
 
 void Fbot::control_ac_silent(bool state) {
-  // AC Silent uses holding register 57 (settings register)
+  // AC Silent uses holding register (settings register)
   // Function code 0x06 (Write Single Register) writes to holding registers
-  this->send_control_command(REG_AC_SILENT_CONTROL, state ? 1 : 0);
+  this->send_control_command(this->register_map_.ac_silent_register, state ? 1 : 0);
   
   // Request settings update to confirm the change
   this->set_timeout(500, [this]() { 
@@ -653,9 +712,9 @@ void Fbot::control_ac_silent(bool state) {
 }
 
 void Fbot::control_key_sound(bool state) {
-  // Key Sound uses holding register 56 (settings register)
+  // Key Sound uses holding register (settings register)
   // Function code 0x06 (Write Single Register) writes to holding registers
-  this->send_control_command(REG_KEY_SOUND, state ? 1 : 0);
+  this->send_control_command(this->register_map_.key_sound_register, state ? 1 : 0);
   
   // Request settings update to confirm the change
   this->set_timeout(500, [this]() { 
@@ -668,7 +727,7 @@ void Fbot::set_threshold_charge(float percent) {
   uint16_t value = static_cast<uint16_t>(percent * 10);
   if (value < 100) { value = 100; }  // Minimum 100
   if (value > 1000) { value = 1000; }  // Maximum 1000
-  this->send_control_command(REG_THRESHOLD_CHARGE, value);
+  this->send_control_command(this->register_map_.threshold_charge_register, value);
 }
 
 void Fbot::set_threshold_discharge(float percent) {
@@ -676,7 +735,7 @@ void Fbot::set_threshold_discharge(float percent) {
   uint16_t value = static_cast<uint16_t>(percent * 10);
   if (value < 0) { value = 0; }  // Minimum 0
   if (value > 500) { value = 500; }  // Maximum 500
-  this->send_control_command(REG_THRESHOLD_DISCHARGE, value);
+  this->send_control_command(this->register_map_.threshold_discharge_register, value);
 }
 
 void Fbot::set_wifi_credentials(const std::string &ssid, const std::string &password) {
