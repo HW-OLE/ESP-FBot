@@ -198,6 +198,7 @@ class Fbot : public esphome::ble_client::BLEClientNode, public Component {
   void set_ac_input_power_sensor(sensor::Sensor *sensor) { this->ac_input_power_sensor_ = sensor; }
   void set_dc_input_power_sensor(sensor::Sensor *sensor) { this->dc_input_power_sensor_ = sensor; }
   void set_output_power_sensor(sensor::Sensor *sensor) { this->output_power_sensor_ = sensor; }
+  void set_output_power_ges_sensor(sensor::Sensor *sensor) { this->output_power_ges_sensor_ = sensor; }
   void set_system_power_sensor(sensor::Sensor *sensor) { this->system_power_sensor_ = sensor; }
   void set_total_power_sensor(sensor::Sensor *sensor) { this->total_power_sensor_ = sensor; }
   void set_remaining_time_sensor(sensor::Sensor *sensor) { this->remaining_time_sensor_ = sensor; }
@@ -310,6 +311,7 @@ class Fbot : public esphome::ble_client::BLEClientNode, public Component {
   sensor::Sensor *ac_input_power_sensor_{nullptr};
   sensor::Sensor *dc_input_power_sensor_{nullptr};
   sensor::Sensor *output_power_sensor_{nullptr};
+  sensor::Sensor *output_power_ges_sensor_{nullptr};
   sensor::Sensor *system_power_sensor_{nullptr};
   sensor::Sensor *total_power_sensor_{nullptr};
   sensor::Sensor *remaining_time_sensor_{nullptr};
