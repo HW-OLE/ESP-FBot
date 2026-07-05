@@ -255,6 +255,47 @@ void Fbot::dump_frame_bytes(const uint8_t *data, uint16_t length, const char *la
   }
 }
 
+void Fbot::log_register_summary(const uint8_t *data, uint16_t length, const char *context) {
+  uint16_t reg_count = this->register_map_.register_count;
+  if (length < 6) {
+    ESP_LOGD(TAG, "Register summary (%s): response too short", context);
+    return;
+  }
+
+  ESP_LOGD(TAG, "Register summary (%s, %u regs):", context, reg_count);
+  uint16_t line_count = (reg_count + 7) / 8;
+  for (uint16_t line = 0; line < line_count; ++line) {
+    uint16_t start = line * 8;
+    uint16_t end = start + 8;
+    if (end > reg_count) {
+      end = reg_count;
+    }
+
+    char buffer[256];
+    char *ptr = buffer;
+    int remaining = sizeof(buffer);
+    ptr += snprintf(ptr, remaining, "  regs[%02u-%02u]", start, end - 1);
+
+    for (uint16_t reg = start; reg < end; ++reg) {
+      uint16_t value = this->get_register(data, length, reg);
+      ptr += snprintf(ptr, remaining, " %02u=%u", reg, value);
+    }
+    ESP_LOGD(TAG, "%s", buffer);
+  }
+
+  uint16_t soc_raw = this->get_register(data, length, this->register_map_.soc_register);
+  uint16_t charge_level_raw = this->get_register(data, length, 2);
+  uint16_t state_flags = this->get_register(data, length, this->register_map_.state_flags_register);
+  uint16_t ac_input_watts = this->get_register(data, length, 3);
+  uint16_t dc_input_watts = this->get_register(data, length, 4);
+  uint16_t input_watts = this->get_register(data, length, 6);
+  uint16_t output_watts = this->get_register(data, length, 39);
+  ESP_LOGD(TAG,
+           "Meaningful probes: soc_raw=%u soc=%.1f%% charge_level_raw=%u input=%u output=%u flags=0x%04x ac_in=%u dc_in=%u",
+           soc_raw, soc_raw / 10.0f, charge_level_raw, input_watts, output_watts, state_flags,
+           ac_input_watts, dc_input_watts);
+}
+
 void Fbot::send_read_request() {
   if (!this->connected_ || !this->characteristics_discovered_) {
     return;
@@ -347,6 +388,7 @@ void Fbot::parse_notification(const uint8_t *data, uint16_t length) {
   
   // Dump raw frame bytes for debugging (very verbose level)
   this->dump_frame_bytes(data, length, "RX Frame");
+  this->log_register_summary(data, length, "status");
   
   // ANY valid notification means device is responding - reset failure counter
   this->consecutive_poll_failures_ = 0;
@@ -534,6 +576,7 @@ void Fbot::parse_settings_notification(const uint8_t *data, uint16_t length) {
   
   // Dump raw frame bytes for debugging (very verbose level)
   this->dump_frame_bytes(data, length, "RX Settings Frame");
+  this->log_register_summary(data, length, "settings");
   
   // Mark that we've received settings at least once
   if (!this->settings_received_) {

@@ -328,6 +328,7 @@ class Fbot : public esphome::ble_client::BLEClientNode, public Component {
   void parse_settings_notification(const uint8_t *data, uint16_t length);
   uint16_t get_register(const uint8_t *data, uint16_t length, uint16_t reg_index);
   void dump_frame_bytes(const uint8_t *data, uint16_t length, const char *label);
+  void log_register_summary(const uint8_t *data, uint16_t length, const char *context);
   void update_register_map();
   
   // State management
