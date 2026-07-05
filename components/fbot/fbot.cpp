@@ -291,9 +291,9 @@ void Fbot::log_register_summary(const uint8_t *data, uint16_t length, const char
   uint16_t input_watts = this->get_register(data, length, 6);
   uint16_t output_watts = this->get_register(data, length, 39);
   ESP_LOGD(TAG,
-           "Meaningful probes: soc_raw=%u soc=%.1f%% charge_level_raw=%u input=%u output=%u flags=0x%04x ac_in=%u dc_in=%u",
+           "Meaningful probes: soc_raw=%u soc=%.1f%% charge_level_raw=%u input=%u output=%u flags=0x%04x ac_in=%u dc_in=%u p180_state_bytes=%u,%u,%u",
            soc_raw, soc_raw / 10.0f, charge_level_raw, input_watts, output_watts, state_flags,
-           ac_input_watts, dc_input_watts);
+           ac_input_watts, dc_input_watts, data[113], data[114], data[115]);
 }
 
 void Fbot::send_read_request() {
@@ -450,22 +450,24 @@ void Fbot::parse_notification(const uint8_t *data, uint16_t length) {
   uint16_t output_watts = this->get_register(data, length, 39);
   uint16_t state_flags = this->get_register(data, length, this->register_map_.state_flags_register);
   if (this->device_type_ == DeviceType::P180 && length > 115) {
-    if (input_watts == 0) {
-      input_watts = this->get_register(data, length, 99) / 100u;
+    uint16_t p180_input_watts = this->get_register(data, length, 99);
+    uint16_t p180_output_watts = this->get_register(data, length, 75);
+    if (input_watts == 0 && p180_input_watts > 0) {
+      input_watts = p180_input_watts / 100u;
     }
-    if (output_watts == 0) {
-      output_watts = this->get_register(data, length, 75) / 100u;
+    if (output_watts == 0 && p180_output_watts > 0) {
+      output_watts = p180_output_watts / 100u;
     }
-    if (dc_input_watts == 0) {
+    if (dc_input_watts == 0 && input_watts > 0) {
       dc_input_watts = input_watts;
     }
-    if (ac_input_watts == 0) {
+    if (ac_input_watts == 0 && input_watts > 0) {
       ac_input_watts = input_watts;
     }
     if (state_flags == 0) {
-      bool usb_state_p180 = (data[113] & 0x01) != 0;
-      bool dc_state_p180 = (data[114] & 0x01) != 0;
-      bool ac_state_p180 = (data[115] & 0x01) != 0;
+      bool usb_state_p180 = data[113] != 0;
+      bool dc_state_p180 = data[114] != 0;
+      bool ac_state_p180 = data[115] != 0;
       state_flags = (usb_state_p180 ? STATE_USB_BIT : 0) |
                     (dc_state_p180 ? STATE_DC_BIT : 0) |
                     (ac_state_p180 ? STATE_AC_BIT : 0);
