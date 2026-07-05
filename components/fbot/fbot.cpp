@@ -9,6 +9,19 @@ namespace fbot {
 
 static const char *const TAG = "fbot";
 
+static uint16_t derive_p180_state_flags(const uint8_t *data, uint16_t length, uint16_t state_flags) {
+  if (state_flags != 0 || length <= 115) {
+    return state_flags;
+  }
+
+  bool usb_state_p180 = data[113] != 0;
+  bool dc_state_p180 = data[114] != 0;
+  bool ac_state_p180 = data[115] != 0;
+  return (usb_state_p180 ? STATE_USB_BIT : 0) |
+         (dc_state_p180 ? STATE_DC_BIT : 0) |
+         (ac_state_p180 ? STATE_AC_BIT : 0);
+}
+
 void Fbot::setup() {
   ESP_LOGCONFIG(TAG, "Setting up Fbot...");
   this->write_handle_ = 0;
@@ -289,20 +302,24 @@ void Fbot::log_register_summary(const uint8_t *data, uint16_t length, const char
   uint16_t ac_input_watts = this->get_register(data, length, this->register_map_.ac_input_power_register);
   uint16_t dc_input_watts = this->get_register(data, length, this->register_map_.dc_input_power_register);
   uint16_t input_watts = this->get_register(data, length, 6);
-  if (this->device_type_ == DeviceType::P180) {
-    uint16_t p180_dc_input_watts = this->get_register(data, length, 3);
-    if (p180_dc_input_watts > 0 && dc_input_watts == 0) {
-      dc_input_watts = p180_dc_input_watts;
-    }
-    if (dc_input_watts > 0) {
-      ac_input_watts = 0;
-    }
-  }
   uint16_t output_watts = this->get_register(data, length, this->register_map_.output_power_register);
-  ESP_LOGD(TAG,
-           "Meaningful probes: soc_raw=%u soc=%.1f%% charge_level_raw=%u input=%u output=%u flags=0x%04x ac_in=%u dc_in=%u p180_state_bytes=%u,%u,%u",
-           soc_raw, soc_raw / 1.0f, charge_level_raw, input_watts, output_watts, state_flags,
-           ac_input_watts, dc_input_watts, data[113], data[114], data[115]);
+  if (context != nullptr && std::string(context) != "settings") {
+    if (this->device_type_ == DeviceType::P180) {
+      uint16_t p180_dc_input_watts = this->get_register(data, length, 3);
+      if (p180_dc_input_watts > 0 && dc_input_watts == 0) {
+        dc_input_watts = p180_dc_input_watts;
+      }
+      if (dc_input_watts > 0) {
+        ac_input_watts = 0;
+      }
+    }
+    ESP_LOGD(TAG,
+             "Meaningful probes: soc_raw=%u soc=%.1f%% charge_level_raw=%u input=%u output=%u flags=0x%04x ac_in=%u dc_in=%u p180_state_bytes=%u,%u,%u",
+             soc_raw, soc_raw / 10.0f, charge_level_raw, input_watts, output_watts, state_flags,
+             ac_input_watts, dc_input_watts, data[113], data[114], data[115]);
+  } else {
+    ESP_LOGD(TAG, "Meaningful probes: skipped for settings response");
+  }
 }
 
 void Fbot::send_read_request() {
@@ -469,7 +486,7 @@ void Fbot::parse_notification(const uint8_t *data, uint16_t length) {
     if (dc_input_watts == 0 && input_watts > 0) {
       dc_input_watts = input_watts;
     }
-    if (ac_input_watts == 0 && input_watts > 0) {
+    if (dc_input_watts > 0) {
       ac_input_watts = 0;
     }
     if (output_watts == 0) {
@@ -478,14 +495,7 @@ void Fbot::parse_notification(const uint8_t *data, uint16_t length) {
         output_watts = p180_output_watts;
       }
     }
-    if (state_flags == 0) {
-      bool usb_state_p180 = data[113] != 0;
-      bool dc_state_p180 = data[114] != 0;
-      bool ac_state_p180 = data[115] != 0;
-      state_flags = (usb_state_p180 ? STATE_USB_BIT : 0) |
-                    (dc_state_p180 ? STATE_DC_BIT : 0) |
-                    (ac_state_p180 ? STATE_AC_BIT : 0);
-    }
+    state_flags = derive_p180_state_flags(data, length, state_flags);
   }
   float ac_out_voltage = this->get_register(data, length, this->register_map_.ac_out_voltage_register) * 0.1f;
   float ac_out_frequency = this->get_register(data, length, 19) * 0.1f;
