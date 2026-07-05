@@ -119,7 +119,7 @@ parse_notification() uses register_map_.soc_register, etc.
 | DC Input Power | 3 | Used for DC input watts |
 | AC Input Power | 4 | Secondary input register |
 | AC Control | 26 | **CONFIRMED** via local testing |
-| State Flags / Active Outputs | 41 + bytes 113-115 | Used to infer USB/DC/AC activity on P180 |
+| State Flags / Active Outputs | 41 + bytes 113-115 | Used to infer USB/DC/AC activity on P180. Confirmed is only the Register 113 for turning the AC Outlet/Inverter on. Register 115 seems to be the USB Port, but when the USB on Button is pressed, Register 114 also turns on, so USB-C and USB-A Ports may be on different registers|
 
 ### Debug Output Example
 
