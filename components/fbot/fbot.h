@@ -53,8 +53,9 @@ struct RegisterMap {
   uint8_t dc_input_power_register;
 
   // Output power registers
-  uint8_t output_power_register;
+  //uint8_t output_power_register;
   uint8_t ac_output_power_register;
+  uint8_t output_power_ges_register;
   uint8_t ac_out_voltage_register;
   uint8_t usb_a1_out_register;
   uint8_t usb_a2_out_register;
@@ -84,6 +85,7 @@ static const RegisterMap REGISTER_MAP_P210_P310 = {
   .light_control_register = 27,
   .ac_input_power_register = 3,
   .dc_input_power_register = 4,
+  .output_power_ges_register = 0,
   .output_power_register = 39,
   .ac_out_voltage_register = 18,
   .usb_a1_out_register = 30,
