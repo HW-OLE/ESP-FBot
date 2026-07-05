@@ -450,11 +450,10 @@ void Fbot::parse_notification(const uint8_t *data, uint16_t length) {
   uint16_t input_watts = this->get_register(data, length, 6);
   uint16_t total_watts = this->get_register(data, length, 20);
   uint16_t system_watts = this->get_register(data, length, 21);
-  uint16_t output_watts = this->get_register(data, length, 39);
+  uint16_t output_watts = this->get_register(data, length, this->register_map_.output_power_register);
   uint16_t state_flags = this->get_register(data, length, this->register_map_.state_flags_register);
   if (this->device_type_ == DeviceType::P180 && length > 115) {
     uint16_t p180_input_watts = this->get_register(data, length, 99);
-    uint16_t p180_output_watts = this->get_register(data, length, 75);
     if (input_watts == 0 && p180_input_watts > 0) {
       input_watts = p180_input_watts / 100u;
     }
@@ -463,6 +462,12 @@ void Fbot::parse_notification(const uint8_t *data, uint16_t length) {
     }
     if (ac_input_watts == 0 && input_watts > 0) {
       ac_input_watts = 0;
+    }
+    if (output_watts == 0) {
+      uint16_t p180_output_watts = this->get_register(data, length, 13);
+      if (p180_output_watts > 0) {
+        output_watts = p180_output_watts;
+      }
     }
     if (state_flags == 0) {
       bool usb_state_p180 = data[113] != 0;
@@ -473,7 +478,7 @@ void Fbot::parse_notification(const uint8_t *data, uint16_t length) {
                     (ac_state_p180 ? STATE_AC_BIT : 0);
     }
   }
-  float ac_out_voltage = this->get_register(data, length, 18) * 0.1f;
+  float ac_out_voltage = this->get_register(data, length, this->register_map_.ac_out_voltage_register) * 0.1f;
   float ac_out_frequency = this->get_register(data, length, 19) * 0.1f;
   float ac_in_frequency = this->get_register(data, length, 22) * 0.01f;
   uint16_t time_to_full = this->get_register(data, length, 58);
