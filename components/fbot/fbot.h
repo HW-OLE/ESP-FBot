@@ -48,6 +48,10 @@ struct RegisterMap {
   uint8_t ac_control_register;
   uint8_t light_control_register;
   
+  // Input power registers
+  uint8_t ac_input_power_register;
+  uint8_t dc_input_power_register;
+
   // Output power registers
   uint8_t output_power_register;
   uint8_t ac_out_voltage_register;
@@ -77,6 +81,8 @@ static const RegisterMap REGISTER_MAP_P210_P310 = {
   .dc_control_register = 25,
   .ac_control_register = 26,
   .light_control_register = 27,
+  .ac_input_power_register = 3,
+  .dc_input_power_register = 4,
   .output_power_register = 39,
   .ac_out_voltage_register = 18,
   .usb_a1_out_register = 30,
@@ -106,6 +112,8 @@ static const RegisterMap REGISTER_MAP_P180 = {
   .dc_control_register = 25,       // Confirmed AC (26) works. DC/USB/Light need verification.
   .ac_control_register = 26,       // CONFIRMED via local MQTT: register 26 (0x1A) = AC control
   .light_control_register = 27,    // TODO: Needs verification
+  .ac_input_power_register = 4,    // P180 AC input register remains experimental
+  .dc_input_power_register = 3,    // P180 DC input appears to be at register 3
   .output_power_register = 12,     // P180 AC outlet output power (registers 12/90)
   .ac_out_voltage_register = 10,   // P180 AC output voltage appears at register 10 (230V -> ~2308)
   .usb_a1_out_register = 30,       // TODO: Verify USB port power registers
