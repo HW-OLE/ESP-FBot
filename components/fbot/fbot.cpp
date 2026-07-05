@@ -415,10 +415,13 @@ void Fbot::parse_notification(const uint8_t *data, uint16_t length) {
   
   // Parse key registers
   uint16_t battery_percent_raw = this->get_register(data, length, this->register_map_.soc_register);
-  float battery_percent = battery_percent_raw / 10.0f;
-  if (this->device_type_ == DeviceType::P180 && battery_percent_raw == 0) {
-    battery_percent = this->get_register(data, length, 53) / 10.0f;
+  if (this->device_type_ == DeviceType::P180) {
+    uint16_t p180_soc_percent_raw = this->get_register(data, length, 31);
+    if (p180_soc_percent_raw > 0 && p180_soc_percent_raw <= 100) {
+      battery_percent_raw = p180_soc_percent_raw;
+    }
   }
+  float battery_percent = battery_percent_raw <= 100 ? battery_percent_raw : battery_percent_raw / 10.0f;
   // Extra batteries (S1 / S2) ranges are 1 to 101, 0 means disconnected. Adding -1 to get proper range.
   float battery_percent_s1 = this->get_register(data, length, this->register_map_.battery_s1_register) / 10.0f - 1.0f;
   float battery_percent_s2 = this->get_register(data, length, this->register_map_.battery_s2_register) / 10.0f - 1.0f;
@@ -454,9 +457,6 @@ void Fbot::parse_notification(const uint8_t *data, uint16_t length) {
     uint16_t p180_output_watts = this->get_register(data, length, 75);
     if (input_watts == 0 && p180_input_watts > 0) {
       input_watts = p180_input_watts / 100u;
-    }
-    if (output_watts == 0 && p180_output_watts > 0) {
-      output_watts = p180_output_watts / 100u;
     }
     if (dc_input_watts == 0 && input_watts > 0) {
       dc_input_watts = input_watts;

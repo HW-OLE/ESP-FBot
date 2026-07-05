@@ -94,7 +94,7 @@ static const RegisterMap REGISTER_MAP_P210_P310 = {
 // See: https://github.com/iamslan/ha-fossibot/issues/31 and https://github.com/schauveau/lesyd/issues/6
 static const RegisterMap REGISTER_MAP_P180 = {
   .register_count = 100,           // 0x64 - P180 uses 100 registers vs 80 for P210/P310
-  .soc_register = 53,              // P180 primary SOC register based on current behavior
+  .soc_register = 31,              // P180 primary SOC register: observed as raw 56 -> 56%
   .battery_s1_register = 56,
   .battery_s2_register = 55,
   .state_flags_register = 41,      // P180 state flags still assumed to match P210/P310
