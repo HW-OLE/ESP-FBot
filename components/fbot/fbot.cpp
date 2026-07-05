@@ -286,10 +286,19 @@ void Fbot::log_register_summary(const uint8_t *data, uint16_t length, const char
   uint16_t soc_raw = this->get_register(data, length, this->register_map_.soc_register);
   uint16_t charge_level_raw = this->get_register(data, length, 2);
   uint16_t state_flags = this->get_register(data, length, this->register_map_.state_flags_register);
-  uint16_t ac_input_watts = this->get_register(data, length, 3);
-  uint16_t dc_input_watts = this->get_register(data, length, 4);
+  uint16_t ac_input_watts = this->get_register(data, length, this->register_map_.ac_input_power_register);
+  uint16_t dc_input_watts = this->get_register(data, length, this->register_map_.dc_input_power_register);
   uint16_t input_watts = this->get_register(data, length, 6);
-  uint16_t output_watts = this->get_register(data, length, 39);
+  if (this->device_type_ == DeviceType::P180) {
+    uint16_t p180_dc_input_watts = this->get_register(data, length, 3);
+    if (p180_dc_input_watts > 0 && dc_input_watts == 0) {
+      dc_input_watts = p180_dc_input_watts;
+    }
+    if (dc_input_watts > 0) {
+      ac_input_watts = 0;
+    }
+  }
+  uint16_t output_watts = this->get_register(data, length, this->register_map_.output_power_register);
   ESP_LOGD(TAG,
            "Meaningful probes: soc_raw=%u soc=%.1f%% charge_level_raw=%u input=%u output=%u flags=0x%04x ac_in=%u dc_in=%u p180_state_bytes=%u,%u,%u",
            soc_raw, soc_raw / 10.0f, charge_level_raw, input_watts, output_watts, state_flags,
