@@ -414,7 +414,11 @@ void Fbot::parse_notification(const uint8_t *data, uint16_t length) {
   }
   
   // Parse key registers
-  float battery_percent = this->get_register(data, length, this->register_map_.soc_register) / 10.0f;
+  uint16_t battery_percent_raw = this->get_register(data, length, this->register_map_.soc_register);
+  float battery_percent = battery_percent_raw / 10.0f;
+  if (this->device_type_ == DeviceType::P180 && battery_percent_raw == 0) {
+    battery_percent = this->get_register(data, length, 53) / 10.0f;
+  }
   // Extra batteries (S1 / S2) ranges are 1 to 101, 0 means disconnected. Adding -1 to get proper range.
   float battery_percent_s1 = this->get_register(data, length, this->register_map_.battery_s1_register) / 10.0f - 1.0f;
   float battery_percent_s2 = this->get_register(data, length, this->register_map_.battery_s2_register) / 10.0f - 1.0f;
@@ -445,6 +449,28 @@ void Fbot::parse_notification(const uint8_t *data, uint16_t length) {
   uint16_t system_watts = this->get_register(data, length, 21);
   uint16_t output_watts = this->get_register(data, length, 39);
   uint16_t state_flags = this->get_register(data, length, this->register_map_.state_flags_register);
+  if (this->device_type_ == DeviceType::P180 && length > 115) {
+    if (input_watts == 0) {
+      input_watts = this->get_register(data, length, 99) / 100u;
+    }
+    if (output_watts == 0) {
+      output_watts = this->get_register(data, length, 75) / 100u;
+    }
+    if (dc_input_watts == 0) {
+      dc_input_watts = input_watts;
+    }
+    if (ac_input_watts == 0) {
+      ac_input_watts = input_watts;
+    }
+    if (state_flags == 0) {
+      bool usb_state_p180 = (data[113] & 0x01) != 0;
+      bool dc_state_p180 = (data[114] & 0x01) != 0;
+      bool ac_state_p180 = (data[115] & 0x01) != 0;
+      state_flags = (usb_state_p180 ? STATE_USB_BIT : 0) |
+                    (dc_state_p180 ? STATE_DC_BIT : 0) |
+                    (ac_state_p180 ? STATE_AC_BIT : 0);
+    }
+  }
   float ac_out_voltage = this->get_register(data, length, 18) * 0.1f;
   float ac_out_frequency = this->get_register(data, length, 19) * 0.1f;
   float ac_in_frequency = this->get_register(data, length, 22) * 0.01f;
