@@ -105,30 +105,50 @@ static const RegisterMap REGISTER_MAP_P210_P310 = {
 // See: https://github.com/iamslan/ha-fossibot/issues/31 and https://github.com/schauveau/lesyd/issues/6
 static const RegisterMap REGISTER_MAP_P180 = {
   .register_count = 100,           // 0x64 - P180 uses 100 registers vs 80 for P210/P310
-  .soc_register = 31,              // P180 primary SOC register: observed as raw 56 -> 56%
-  .battery_s1_register = 56,
-  .battery_s2_register = 55,
-  .state_flags_register = 41,      // P180 state flags still assumed to match P210/P310
-  .usb_control_register = 24,      // TODO: Verify control register addresses
-  .dc_control_register = 25,       // Confirmed AC (26) works. DC/USB/Light need verification.
-  .ac_control_register = 26,       // CONFIRMED via local MQTT: register 26 (0x1A) = AC control
-  .light_control_register = 27,    // TODO: Needs verification
-  .ac_input_power_register = 4,    // P180 AC input register remains experimental
-  .dc_input_power_register = 3,    // P180 DC input appears to be at register 3
-  .ac_output_power_register = 12,     // P180 AC outlet output power (registers 12/90)
-  .output_power_ges_register = 13,       // P180 total output power (registers 13/91)
-  .ac_out_voltage_register = 10,   // P180 AC output voltage appears at register 10 (230V -> ~2308)
-  .usb_a1_out_register = 30,       // TODO: Verify USB port power registers
-  .usb_a2_out_register = 31,       // TODO: Verify USB port power registers
-  .usb_c1_out_register = 34,       // TODO: Verify USB port power registers
-  .usb_c2_out_register = 35,       // TODO: Verify USB port power registers
-  .usb_c3_out_register = 36,       // TODO: Verify USB port power registers
-  .usb_c4_out_register = 37,       // TODO: Verify USB port power registers
-  .key_sound_register = 56,        // TODO: Verify settings registers
-  .ac_silent_register = 57,        // TODO: Verify settings registers
-  .threshold_discharge_register = 66,  // TODO: Verify settings registers
-  .threshold_charge_register = 67,     // TODO: Verify settings registers
-  .ac_charge_limit_register = 13,      // TODO: Verify settings registers
+
+  // ---- Bestätigt über 4 Logs hinweg ----
+  .soc_register = 31,               // CONFIRMED: entspricht exakt soc_raw/soc% in jedem Log
+  .ac_input_power_register = 4,     // CONFIRMED: ac_in, konstant 0 wenn kein AC-Eingang anliegt
+  .dc_input_power_register = 3,     // CONFIRMED: dc_in, folgt echtem Solarverlauf (z.B. 94->29W)
+  .ac_output_power_register = 12,   // CONFIRMED: AC-Ausgangsleistung (Duplikat exakt bei Reg 90)
+  .output_power_ges_register = 13,  // CONFIRMED (Konzept): Gesamtausgang, ~10W über Reg 12 wenn
+                                     // zusätzlich USB-C/DC-Ports belastet sind.
+                                     // Achtung: KEIN Duplikat bei Reg 91 (91 ist immer 0) - alten
+                                     // Kommentar dazu entfernt.
+  .ac_out_voltage_register = 10,    // CONFIRMED: ~230V*10 (z.B. 2313-2318)
+
+  // ---- Korrigiert ----
+  .state_flags_register = 37,       // CORRECTED (war 41): Reg 41 ist in allen 4 Logs konstant 0.
+                                     // Reg 37 zeigt die echte Flag-Bitmaske (0/16384/32768/32832),
+                                     // reagiert zuverlässig auf jeden Last-/Taster-Wechsel.
+
+  // ---- Konflikte entfernt / als offen markiert ----
+  .usb_a1_out_register = 30,        // TODO: unverändert 0 trotz aktiver USB-Last in Log 4 -> unbestätigt
+  .usb_a2_out_register = -1,        // REMOVED (war 31): Konflikt mit soc_register (31 = eindeutig SoC%)
+  .usb_c1_out_register = 34,        // TODO: unverändert 0 trotz aktiver USB-C-Last -> unbestätigt
+  .usb_c2_out_register = 35,        // TODO: unverändert 0 -> unbestätigt
+  .usb_c3_out_register = 36,        // TODO: konstant 12288 (wirkt wie Geräteparameter, kein Watt-Wert)
+  .usb_c4_out_register = -1,        // REMOVED (war 37): Konflikt mit state_flags_register
+
+  .battery_s1_register = 56,        // unverifiable: S1 in jedem Log "nan / con:0" (nie angeschlossen)
+  .battery_s2_register = 55,        // unverifiable: gleiche Einschränkung wie s1
+
+  .key_sound_register = -1,         // REMOVED (war 56): Konflikt mit battery_s1_register
+                                     // TODO: neu bestimmen, Settings-Bank Test mit Key-Sound=1 nötig
+  .ac_silent_register = 57,         // TODO: unverifiable, Settings-Wert war in jedem Log 0
+
+  .threshold_discharge_register = 66,  // TODO: unverifiable, war immer 0.0% in jedem Log
+  .threshold_charge_register = 67,     // TODO: unverifiable, war immer 0.0% in jedem Log
+  .ac_charge_limit_register = 13,      // Hinweis: gleicher Index wie output_power_ges_register,
+                                        // aber vermutlich andere Registerbank ("settings" statt
+                                        // "status") - kein echter Konflikt, sofern Code die Bank
+                                        // korrekt unterscheidet. Bitte im Treiber gegenchecken.
+
+  // ---- Unverändert, per MQTT bereits bestätigt bzw. reine Schreibregister ----
+  .usb_control_register = 24,       // TODO: Verify control register addresses
+  .dc_control_register = 25,        // TODO: Verify control register addresses
+  .ac_control_register = 26,        // CONFIRMED via local MQTT
+  .light_control_register = 27,     // TODO: Verify control register addresses
 };
 
 // State flag bit masks for register 41 (P210/P310)
