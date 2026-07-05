@@ -301,7 +301,7 @@ void Fbot::log_register_summary(const uint8_t *data, uint16_t length, const char
   uint16_t output_watts = this->get_register(data, length, this->register_map_.output_power_register);
   ESP_LOGD(TAG,
            "Meaningful probes: soc_raw=%u soc=%.1f%% charge_level_raw=%u input=%u output=%u flags=0x%04x ac_in=%u dc_in=%u p180_state_bytes=%u,%u,%u",
-           soc_raw, soc_raw / 10.0f, charge_level_raw, input_watts, output_watts, state_flags,
+           soc_raw, soc_raw / 1.0f, charge_level_raw, input_watts, output_watts, state_flags,
            ac_input_watts, dc_input_watts, data[113], data[114], data[115]);
 }
 
@@ -608,8 +608,8 @@ void Fbot::parse_notification(const uint8_t *data, uint16_t length) {
   }
   
   ESP_LOGD(TAG, "Battery: %.1f%% S1:%.1f%%(con:%d) S2:%.1f%%(con:%d), Input: %dW, Output: %dW, USB: %d, DC: %d, AC: %d", 
-           battery_percent, battery_percent_s1, battery_s1_connected, battery_percent_s2, battery_s2_connected, 
-           input_watts, output_watts, usb_state, dc_state, ac_state);
+           battery_percent, battery_percent, battery_s1_connected, battery_percent_s2, battery_s2_connected, 
+           dc_input_watts, output_watts, usb_state, dc_state, ac_state);
 }
 
 void Fbot::parse_settings_notification(const uint8_t *data, uint16_t length) {
