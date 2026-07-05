@@ -5,6 +5,14 @@
 # - Uses 100 Modbus registers (vs 80 for P210/P310)
 # - Requires device_model: p180 configuration
 # - Power readings may differ in range and accuracy vs P210/P310
+# - Current empirical P180 mappings used by the component:
+#   - SOC: register 31
+#   - AC output power: register 12 (fallback to 13 when 12 reads 0)
+#   - AC output voltage: register 10
+#   - DC input power: register 3
+#   - AC input power: register 4
+#   - AC control: register 26
+#   - Active output bits: register 41 + bytes 113-115
 #
 # To get the MAC address:
 # - On Windows, use BluetoothLEView: https://www.nirsoft.net/utils/bluetooth_low_energy_scanner.html

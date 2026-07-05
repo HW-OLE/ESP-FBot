@@ -285,9 +285,16 @@ fbot:
 
 **Important Notes for P180:**
 - The P180 uses 100 Modbus registers instead of 80, which this component now handles automatically
-- Output control writes (AC/DC/USB/Light switching) are confirmed working for AC output
-- DC/USB/Light control registers are marked with TODO comments pending empirical verification on real hardware
-- Register offsets for sensor readings may vary; enable `VERY_VERBOSE` logging to dump raw frame bytes for verification
+- Output control writes (AC/DC/USB/Light switching) are supported through device-specific register mapping
+- Current empirical P180 register mappings used by the component are:
+  - SOC: register 31
+  - AC output power: register 12 (with fallback to register 13 when register 12 reads 0)
+  - AC output voltage: register 10
+  - DC input power: register 3
+  - AC input power: register 4
+  - AC output control: register 26
+  - State/active-output bits: register 41 plus the P180 state bytes at offsets 113-115
+- Register offsets for sensor readings may still vary slightly by firmware revision; enable `VERY_VERBOSE` logging to dump raw frame bytes for verification
 - See [community reverse-engineering](https://github.com/iamslan/ha-fossibot/issues/31) for technical details
 
 **Debugging P180 Register Offsets:**

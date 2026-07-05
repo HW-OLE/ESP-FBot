@@ -109,18 +109,17 @@ parse_notification() uses register_map_.soc_register, etc.
 
 ### Register Map Offsets (P180 - Preliminary)
 
-**Based on community reverse-engineering (see references):**
+**Based on the current empirical findings and implementation:**
 
 | Function | Register | Notes |
 |----------|----------|-------|
-| SOC | 56 | May be 53 - needs verification |
-| State Flags (AC/DC/USB/Light) | 41 | TODO: Verify if different on P180 |
-| AC Control | 26 | **CONFIRMED** via local MQTT testing |
-| DC Control | 25 | TODO: Needs verification |
-| USB Control | 24 | TODO: Needs verification |
-| Light Control | 27 | TODO: Needs verification |
-| USB-C1 Power | 34 | TODO: Verify mapping |
-| USB-A1/A2 Power | 30-31 | TODO: Verify mapping |
+| SOC | 31 | Used for battery percentage on P180 |
+| AC Output Power | 12 | Primary mapping; fallback to register 13 when register 12 reads 0 |
+| AC Output Voltage | 10 | Used for AC output voltage |
+| DC Input Power | 3 | Used for DC input watts |
+| AC Input Power | 4 | Secondary input register |
+| AC Control | 26 | **CONFIRMED** via local testing |
+| State Flags / Active Outputs | 41 + bytes 113-115 | Used to infer USB/DC/AC activity on P180 |
 
 ### Debug Output Example
 

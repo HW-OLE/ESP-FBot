@@ -454,8 +454,8 @@ void Fbot::parse_notification(const uint8_t *data, uint16_t length) {
   if (battery_percent_s2 < 0.0f || battery_percent_s2 > 100.0f) {
     battery_percent_s2 = NAN;
   }
-  uint16_t ac_input_watts = this->get_register(data, length, 3);
-  uint16_t dc_input_watts = this->get_register(data, length, 4);
+  uint16_t ac_input_watts = this->get_register(data, length, this->register_map_.ac_input_power_register);
+  uint16_t dc_input_watts = this->get_register(data, length, this->register_map_.dc_input_power_register);
   uint16_t input_watts = this->get_register(data, length, 6);
   uint16_t total_watts = this->get_register(data, length, 20);
   uint16_t system_watts = this->get_register(data, length, 21);
@@ -607,9 +607,9 @@ void Fbot::parse_notification(const uint8_t *data, uint16_t length) {
     this->light_switch_->publish_state(light_state);
   }
   
-  ESP_LOGD(TAG, "Battery: %.1f%% S1:%.1f%%(con:%d) S2:%.1f%%(con:%d), Input: %dW, Output: %dW, USB: %d, DC: %d, AC: %d", 
-           battery_percent, battery_percent, battery_s1_connected, battery_percent_s2, battery_s2_connected, 
-           dc_input_watts, output_watts, usb_state, dc_state, ac_state);
+  ESP_LOGD(TAG, "Battery: %.1f%% S1:%.1f%%(con:%d) S2:%.1f%%(con:%d), DC input: %dW AC input: %dW Output: %dW, USB: %d, DC: %d, AC: %d",
+           battery_percent, battery_percent_s1, battery_s1_connected, battery_percent_s2, battery_s2_connected,
+           dc_input_watts, ac_input_watts, output_watts, usb_state, dc_state, ac_state);
 }
 
 void Fbot::parse_settings_notification(const uint8_t *data, uint16_t length) {
