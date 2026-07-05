@@ -14,9 +14,9 @@ static uint16_t derive_p180_state_flags(const uint8_t *data, uint16_t length, ui
     return state_flags;
   }
 
-  bool usb_state_p180 = data[113] != 0;
+  bool usb_state_p180 = data[115] != 0;
   bool dc_state_p180 = data[114] != 0;
-  bool ac_state_p180 = data[115] != 0;
+  bool ac_state_p180 = data[113] != 0;
   return (usb_state_p180 ? STATE_USB_BIT : 0) |
          (dc_state_p180 ? STATE_DC_BIT : 0) |
          (ac_state_p180 ? STATE_AC_BIT : 0);
