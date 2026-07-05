@@ -54,7 +54,7 @@ struct RegisterMap {
 
   // Output power registers
   uint8_t output_power_register;
-  uint8_t ac_output_power_ges_register;
+  uint8_t ac_output_power_register;
   uint8_t ac_out_voltage_register;
   uint8_t usb_a1_out_register;
   uint8_t usb_a2_out_register;
