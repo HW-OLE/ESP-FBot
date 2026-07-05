@@ -54,6 +54,7 @@ struct RegisterMap {
 
   // Output power registers
   uint8_t output_power_register;
+  uint8_t ac_output_power_ges_register;
   uint8_t ac_out_voltage_register;
   uint8_t usb_a1_out_register;
   uint8_t usb_a2_out_register;
@@ -114,7 +115,8 @@ static const RegisterMap REGISTER_MAP_P180 = {
   .light_control_register = 27,    // TODO: Needs verification
   .ac_input_power_register = 4,    // P180 AC input register remains experimental
   .dc_input_power_register = 3,    // P180 DC input appears to be at register 3
-  .output_power_register = 12,     // P180 AC outlet output power (registers 12/90)
+  .ac_output_power_register = 12,     // P180 AC outlet output power (registers 12/90)
+  .output_power_ges_register = 13,       // P180 total output power (registers 13/91)
   .ac_out_voltage_register = 10,   // P180 AC output voltage appears at register 10 (230V -> ~2308)
   .usb_a1_out_register = 30,       // TODO: Verify USB port power registers
   .usb_a2_out_register = 31,       // TODO: Verify USB port power registers

@@ -302,7 +302,7 @@ void Fbot::log_register_summary(const uint8_t *data, uint16_t length, const char
   uint16_t ac_input_watts = this->get_register(data, length, this->register_map_.ac_input_power_register);
   uint16_t dc_input_watts = this->get_register(data, length, this->register_map_.dc_input_power_register);
   uint16_t input_watts = this->get_register(data, length, 6);
-  uint16_t output_watts = this->get_register(data, length, this->register_map_.output_power_register);
+  uint16_t ac_output_watts = this->get_register(data, length, this->register_map_.ac_output_power_register);
   if (context != nullptr && std::string(context) != "settings") {
     if (this->device_type_ == DeviceType::P180) {
       uint16_t p180_dc_input_watts = this->get_register(data, length, 3);
@@ -315,7 +315,7 @@ void Fbot::log_register_summary(const uint8_t *data, uint16_t length, const char
     }
     ESP_LOGD(TAG,
              "Meaningful probes: soc_raw=%u soc=%.1f%% charge_level_raw=%u input=%u output=%u flags=0x%04x ac_in=%u dc_in=%u p180_state_bytes=%u,%u,%u",
-             soc_raw, soc_raw / 10.0f, charge_level_raw, input_watts, output_watts, state_flags,
+             soc_raw, soc_raw / 10.0f, charge_level_raw, input_watts, ac_output_watts, state_flags,
              ac_input_watts, dc_input_watts, data[113], data[114], data[115]);
   } else {
     ESP_LOGD(TAG, "Meaningful probes: skipped for settings response");
@@ -476,7 +476,7 @@ void Fbot::parse_notification(const uint8_t *data, uint16_t length) {
   uint16_t input_watts = this->get_register(data, length, 6);
   uint16_t total_watts = this->get_register(data, length, 20);
   uint16_t system_watts = this->get_register(data, length, 21);
-  uint16_t output_watts = this->get_register(data, length, this->register_map_.output_power_register);
+  uint16_t ac_output_watts = this->get_register(data, length, this->register_map_.ac_output_power_register);
   uint16_t state_flags = this->get_register(data, length, this->register_map_.state_flags_register);
   if (this->device_type_ == DeviceType::P180 && length > 115) {
     uint16_t p180_input_watts = this->get_register(data, length, 99);
@@ -489,10 +489,10 @@ void Fbot::parse_notification(const uint8_t *data, uint16_t length) {
     if (dc_input_watts > 0) {
       ac_input_watts = 0;
     }
-    if (output_watts == 0) {
-      uint16_t p180_output_watts = this->get_register(data, length, 13);
-      if (p180_output_watts > 0) {
-        output_watts = p180_output_watts;
+    if (ac_output_watts == 0) {
+      uint16_t p180_ac_output_watts = this->get_register(data, length, 13);
+      if (p180_ac_output_watts > 0) {
+        ac_output_watts = p180_ac_output_watts;
       }
     }
     state_flags = derive_p180_state_flags(data, length, state_flags);
@@ -531,7 +531,7 @@ void Fbot::parse_notification(const uint8_t *data, uint16_t length) {
     this->input_power_sensor_->publish_state(input_watts);
   }
   if (this->output_power_sensor_ != nullptr) {
-    this->output_power_sensor_->publish_state(output_watts);
+    this->output_power_sensor_->publish_state(ac_output_watts);
   }
   if (this->system_power_sensor_ != nullptr) {
     this->system_power_sensor_->publish_state(system_watts);
@@ -619,7 +619,7 @@ void Fbot::parse_notification(const uint8_t *data, uint16_t length) {
   
   ESP_LOGD(TAG, "Battery: %.1f%% S1:%.1f%%(con:%d) S2:%.1f%%(con:%d), DC input: %dW AC input: %dW Output: %dW, USB: %d, DC: %d, AC: %d",
            battery_percent, battery_percent_s1, battery_s1_connected, battery_percent_s2, battery_s2_connected,
-           dc_input_watts, ac_input_watts, output_watts, usb_state, dc_state, ac_state);
+           dc_input_watts, ac_input_watts, ac_output_watts, usb_state, dc_state, ac_state);
 }
 
 void Fbot::parse_settings_notification(const uint8_t *data, uint16_t length) {
