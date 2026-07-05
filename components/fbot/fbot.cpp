@@ -462,7 +462,7 @@ void Fbot::parse_notification(const uint8_t *data, uint16_t length) {
       dc_input_watts = input_watts;
     }
     if (ac_input_watts == 0 && input_watts > 0) {
-      ac_input_watts = input_watts;
+      ac_input_watts = 0;
     }
     if (state_flags == 0) {
       bool usb_state_p180 = data[113] != 0;
