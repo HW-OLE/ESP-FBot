@@ -543,8 +543,8 @@ void Fbot::parse_notification(const uint8_t *data, uint16_t length) {
   if (this->output_power_sensor_ != nullptr) {
     this->output_power_sensor_->publish_state(ac_output_watts);
   }
-  if (this->output_power_ges_sensor_ != nullptr) {
-    this->output_power_ges_sensor_->publish_state(output_watts_ges);
+  //if (this->output_power_ges_sensor_ != nullptr) {
+  // this->output_power_ges_sensor_->publish_state(output_watts_ges);
   }
   if (this->system_power_sensor_ != nullptr) {
     this->system_power_sensor_->publish_state(system_watts);
@@ -630,9 +630,9 @@ void Fbot::parse_notification(const uint8_t *data, uint16_t length) {
     this->light_switch_->publish_state(light_state);
   }
   
-  ESP_LOGD(TAG, "Battery: %.1f%% S1:%.1f%%(con:%d) S2:%.1f%%(con:%d), DC input: %dW AC input: %dW AC Output: %dW, Output ges: %dW,USB: %d, DC: %d, AC: %d",
+  ESP_LOGD(TAG, "Battery: %.1f%% S1:%.1f%%(con:%d) S2:%.1f%%(con:%d), DC input: %dW AC input: %dW AC Output: %dW, USB: %d, DC: %d, AC: %d",
            battery_percent, battery_percent_s1, battery_s1_connected, battery_percent_s2, battery_s2_connected,
-           dc_input_watts, ac_input_watts, ac_output_watts, output_watts_ges, usb_state, dc_state, ac_state);
+           dc_input_watts, ac_input_watts, ac_output_watts,  usb_state, dc_state, ac_state);
 }
 
 void Fbot::parse_settings_notification(const uint8_t *data, uint16_t length) {
