@@ -503,7 +503,7 @@ void Fbot::parse_notification(const uint8_t *data, uint16_t length) {
       //if (p180_output_watts_ges > 0) {
       //  output_watts_ges = p180_output_watts_ges;
       //}
-    }
+    //}
 
     state_flags = derive_p180_state_flags(data, length, state_flags);
   }
