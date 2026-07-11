@@ -303,7 +303,7 @@ void Fbot::log_register_summary(const uint8_t *data, uint16_t length, const char
   uint16_t dc_input_watts = this->get_register(data, length, this->register_map_.dc_input_power_register);
   uint16_t input_watts = this->get_register(data, length, 6);
   uint16_t ac_output_watts = this->get_register(data, length, this->register_map_.ac_output_power_register);
-  uint16_t output_watts_ges = this->get_register(data, length, this->register_map_.output_power_ges_register); 
+  //uint16_t output_watts_ges = this->get_register(data, length, this->register_map_.output_power_ges_register); 
   if (context != nullptr && std::string(context) != "settings") {
     if (this->device_type_ == DeviceType::P180) {
       uint16_t p180_dc_input_watts = this->get_register(data, length, 3);
@@ -315,8 +315,8 @@ void Fbot::log_register_summary(const uint8_t *data, uint16_t length, const char
       }
     }
     ESP_LOGD(TAG,
-             "Meaningful probes: soc_raw=%u soc=%.1f%% charge_level_raw=%u input=%u ac_output=%u output_ges=%u flags=0x%04x ac_in=%u dc_in=%u p180_state_bytes=%u,%u,%u",
-             soc_raw, soc_raw / 10.0f, charge_level_raw, input_watts, ac_output_watts, output_watts_ges, state_flags,
+             "Meaningful probes: soc_raw=%u soc=%.1f%% charge_level_raw=%u input=%u ac_output=%u flags=0x%04x ac_in=%u dc_in=%u p180_state_bytes=%u,%u,%u",
+             soc_raw, soc_raw / 10.0f, charge_level_raw, input_watts, ac_output_watts, state_flags,
              ac_input_watts, dc_input_watts, data[113], data[114], data[115]);
   } else {
     ESP_LOGD(TAG, "Meaningful probes: skipped for settings response");
@@ -478,7 +478,7 @@ void Fbot::parse_notification(const uint8_t *data, uint16_t length) {
   uint16_t total_watts = this->get_register(data, length, 20);
   uint16_t system_watts = this->get_register(data, length, 21);
   uint16_t ac_output_watts = this->get_register(data, length, this->register_map_.ac_output_power_register);
-  uint16_t output_watts_ges = this->get_register(data, length, this->register_map_.output_power_ges_register);
+ // uint16_t output_watts_ges = this->get_register(data, length, this->register_map_.output_power_ges_register);
   uint16_t state_flags = this->get_register(data, length, this->register_map_.state_flags_register);
   if (this->device_type_ == DeviceType::P180 && length > 115) {
     uint16_t p180_input_watts = this->get_register(data, length, 99);
@@ -498,11 +498,11 @@ void Fbot::parse_notification(const uint8_t *data, uint16_t length) {
       }
     }
 
-    if (output_watts_ges == 0) {
-      uint16_t p180_output_watts_ges = this->get_register(data, length, 13);
-      if (p180_output_watts_ges > 0) {
-        output_watts_ges = p180_output_watts_ges;
-      }
+    // if (output_watts_ges == 0) {
+      //uint16_t p180_output_watts_ges = this->get_register(data, length, 13);
+      //if (p180_output_watts_ges > 0) {
+      //  output_watts_ges = p180_output_watts_ges;
+      //}
     }
 
     state_flags = derive_p180_state_flags(data, length, state_flags);

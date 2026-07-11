@@ -56,7 +56,7 @@ struct RegisterMap {
   // Output power registers
   uint8_t output_power_register;
   uint8_t ac_output_power_register;
-  uint8_t output_power_ges_register;  // Total output power register
+  //uint8_t output_power_ges_register;  // Total output power register
   uint8_t ac_out_voltage_register;
   uint8_t usb_a1_out_register;
   uint8_t usb_a2_out_register;
@@ -88,7 +88,7 @@ static const RegisterMap REGISTER_MAP_P210_P310 = {
   .dc_input_power_register = 4,
   .output_power_register = 39,
   .ac_output_power_register = 0,     // Not used on P210/P310
-  .output_power_ges_register = 0,    // Not used on P210/P310
+  //.output_power_ges_register = 0,    // Not used on P210/P310
   .ac_out_voltage_register = 18,
   .usb_a1_out_register = 30,
   .usb_a2_out_register = 31,
@@ -118,7 +118,7 @@ static const RegisterMap REGISTER_MAP_P180 = {
   .dc_input_power_register = 3,
   .output_power_register = 0,        // Default 0 since P180 uses ges_register instead
   .ac_output_power_register = 12,
-  .output_power_ges_register = 13,
+  //.output_power_ges_register = 13,
   .ac_out_voltage_register = 10,
   .usb_a1_out_register = 30,
   .usb_a2_out_register = 255,        // Representing -1 safely without narrowing warnings
