@@ -545,7 +545,7 @@ void Fbot::parse_notification(const uint8_t *data, uint16_t length) {
   }
   //if (this->output_power_ges_sensor_ != nullptr) {
   // this->output_power_ges_sensor_->publish_state(output_watts_ges);
-  }
+  //}
   if (this->system_power_sensor_ != nullptr) {
     this->system_power_sensor_->publish_state(system_watts);
   }
